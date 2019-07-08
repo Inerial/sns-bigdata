@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://d3js.org/d3.v4.min.js">
+</script>
+<title>first project</title>
+<style>
+	table { border : 1px solid black; }
+	td { border : 1px solid black; }
+	th { border : 1px solid black; }
+	tr { border : 1px solid black; }
+	#main {
+		display : flex;  
+		width : 100%;
+		height : 800px;
+	}
+	#paddingtop {
+		height : 60px;
+		width : 100%;
+	}
+	#lefttop { height : 15%;}
+	#leftbottom { overflow : scroll;  height : 85%; border: 1px solid black;}
+	.Dosu { display:inline-block; overflow : scroll; width:200px; height:100%; border:1px solid black;}
+	#left {
+		flex : none;
+		width : 400px;
+		border : 1px solid black;
+	}
+	#paddingmain {flex : none; width:10px;}
+	#right {
+		flex :none;
+		width : 800px;
+		border : 1px solid black;
+	}
+	#end { flex : 1; border : 1px solid black; }
+	#header {
+		position : fixed;
+		left : 0;
+		top : 0;
+		height : 60px;
+		width : 100%;
+		background-color : rgb(65,196,136);
+	}
+	#topMENU { line-height : 60px;}
+	#topMENUtail {
+		border : none;
+		padding : 0;
+		line-height : 60px;
+		width : 150px;
+		position : fixed;
+		top : 0;
+		background-color : rgb(65,250,150);
+		color : black;
+	}
+	#topMENUtailAtive {
+		border : none;
+		padding : 0;
+		line-height : 60px;
+		width : 150px;
+		position : fixed;
+		top : 0;
+		background-color : rgb(65,140,90);
+		color : white;
+	}
+	#BarGraph {display:inline-block; margin: 10px 10px 10px 10px;}
+	#BarGraph rect {stroke:black; stroke-width:2px; fill:green; opacity:0.7;}
+	#Histogram {display:inline-block; margin: 10px 10px 10px 10px;}
+	#Histogram rect {stroke:black; stroke-width:2px; fill:green; opacity:0.7;}
+	#ScatterPlot { display:inline-block; margin: 10px;}
+	#ScatterPlot circle {r : 4px;}
+	#ScatterPlot rect {stroke : black; stroke-width:1.5px; fill:white;}
+	.ScatMatrix {display:inline-blokck; margin: 10px 10px 10px 10px;}
+	.ScatMatrix circle {r : 2px;}
+	.ScatMatrix rect {stroke : black; stroke-width:1px; fill:green; opacity :0.7}
+	.title{font-size:25pt; fill:blue; text-anchor:middle;}
+	.barname{font-size: 14pt; text-anchor:middle;}
+	.freq{font-size:14pt; fill:black; text-anchor:middle;}
+	.topname{font-size:14pt; fill:black; text-anchor:middle;}
+	.dataname{font-size:14pt; fill:black; text-anchor:middle;}
+	.mouseOver{font-size:10pt; fill:black; text-anchor:end;}
+	.axis text {font-family:sans-serif; font-size: 15px;}
+	.axis path,
+	.axis line {fill:none; stroke-width:1px; stroke:black;}
+	.valueFormB {margin:5px;}
+	.valueForm {margin:5px; width : 50px;}
+</style>
+</head>
+<body>
+<div id="header">
+	<span style="margin:5px; color:white;">파일 선택 : </span>
+	<input type='file' accept=".csv" onchange='openFile()' style="size:12px; color:white;" id="topMENU">
+</div>
+<div id="paddingtop"></div>
+<div id="main">
+	<div id="left">
+		<div id="lefttop">
+			<span>파일명 : </span>
+			<input type="text" id="csvName" />
+			<br>
+			<span id="firstValueName">MainValue : </span>
+			<select id="firstValue">
+				<option>----------</option>
+			</select>
+			<span id="secondValueName">byValue : </span>
+			<select id="secondValue">
+				<option>----------</option>
+			</select>
+			<br>
+		</div>
+		<div id="leftbottom"></div>
+	</div>
+	<div id="paddingmain"> </div>
+	<div id="right"></div>
+	<div id="paddingmain"> </div>
+	<div id="end"></div>
+</div>
+<script>
+/**** 시작할때 상단의 메뉴를 표시해주는 함수 ****/
+var type = ["막대그래프","히스토그램","산점도","산점도행렬"];
+d3.select("body").append("div").attr("id","mainDiv")
+var mainDiv = d3.select("#mainDiv")
+				.selectAll("button").data(type)
+mainDiv.enter()
+	.append("button").attr("id","topMENUtail").attr("class",function (d) {return d+"asdf";})
+	.style("left",function(d,i){return 350+150*i + "px"}).text(function (d) { return d;})
+	
+/**** 파일 입력시 파일의 주소를 받는 함수
+ **** startFunction으로 주소를 보낸다  */
+function openFile(){
+	var reader = new FileReader();
+	var file = document.getElementById("topMENU").files[0];
+	d3.select("#csvName").attr("value",file.name);
+	reader.onload = function(){ startFunction(reader.result); }
+	if(file) { reader.readAsDataURL(file); } 
+	else {}
+}
+function removeAll(){
+	d3.selectAll("option").remove()
+	d3.selectAll("form").remove()
+	d3.selectAll("svg").remove()
+	d3.selectAll(".Dosu").remove()
+	d3.select(".calcs").remove()
+}
+/**** csv 주소를 받아 데이터를 분류및 각각의 그래프 ready */
+function startFunction(way){
+	d3.select("#mainDiv").remove()
+	d3.csv(way, function(error, data){
+		removeAll();
+		var vname = [];
+		var dataSet = [];
+		var histo = [];
+		parseData(data,vname,dataSet,histo);
+		var type = ["막대그래프","히스토그램","산점도","산점도행렬"];
+		d3.select("body").append("div").attr("id","mainDiv")
+		var mainDiv = d3.select("#mainDiv")
+						.selectAll("button").data(type)
+		mainDiv.enter()
+				.append("button").attr("id","topMENUtail").attr("class",function (d) {return d+"asdf";})
+				.style("left",function(d,i){return 350+150*i + "px"}).text(function (d) { return d;})
+				.on("click", function(d,i){
+					removeAll();
+					d3.select("#topMENUtailAtive").attr("id", "topMENUtail")
+					d3.select(this).attr("id","topMENUtailAtive")
+					if(i == 0) {
+						BoxPlotMain(data, vname, dataSet, histo);
+					}
+					if(i == 1) {
+						HistoPlotMain(data, vname, dataSet, histo);
+					}
+					if(i == 2){
+						ScatterPlotMain(data, vname,dataSet,histo);
+					}
+					if(i == 3){
+						ScatterMatrix(data, vname, dataSet, histo);
+					}
+				})
+		d3.select(".막대그래프asdf").attr("id","topMENUtailAtive")
+		viewData(data);
+		BoxPlotMain(data, vname, dataSet, histo);
+	})
+}
+/**** data값을 leftbottom div에 table로 표시 */
+function viewData(data){
+	text = "<table><tr><th>순번</th>";
+	for(var i = 0; i < data["columns"].length; i++){
+		text += "<th>"+data["columns"][i]+"</th>";
+	}
+	text += "</tr>"
+	for(var i = 1; i <= data.length; i++){
+		text += "<tr><td>" +i+ "</td>";
+		for(var j = 0; j < data["columns"].length; j++){
+			text += "<td>" + data[i-1][data["columns"][j]] + "</td>";
+		}
+		text += "</tr>"
+	}
+	document.getElementById("leftbottom").innerHTML = text + "</table>";
+}
+/**** boxplot을 그리는 함수들 */
+function BoxPlotMain(data, vname, dataSet, histo){
+	//fisrtValue 활성화
+	d3.select("#firstValue").style("visibility","visible")
+	d3.select("#firstValueName").style("visibility","visible")
+	//secondValue 숨기기
+	d3.select("#secondValue").style("visibility","hidden")
+	d3.select("#secondValueName").style("visibility","hidden")
+	d3.select("#firstValueName").text("MainValue : ")
+	
+	var svgBar = {Width:750, Height:750};
+	var margin = {top:70, bottom:30, left:50, right:50};
+	var boxPlotValue = ["----------"];
+	for(var i = 0; i < data["columns"].length; i++){
+		boxPlotValue.push(data["columns"][i]);
+	}
+	var head = d3.select("#firstValue")
+				.selectAll("option").data(boxPlotValue)
+	head.enter()
+		.append("option").attr("value", function(d) {return d;}).text(function(d) {return d;})	
+	d3.select("#secondValue").append("option").text("----------")
+	d3.select("#firstValue").on("change", function() {
+			var i;
+			for(i = 0; i < data["columns"].length; i++){
+				if(data["columns"][i] == this.value) break;
+			}
+			if( this.value != "----------") makeBarPlot(vname[i], dataSet[i], this.value.replace(" ", ""), svgBar, margin, data.length);
+		})
+}
+function makeBarPlot(vname, dataSet, name, svgs, margin, total){
+	d3.select(".Dosu").remove()
+	drawdosu(vname,dataSet,name,calcData(vname,dataSet,total),0);
+	d3.selectAll("svg").remove()
+	d3.selectAll("form").remove()
+	var databig = dataSet[0];
+	var datasmall = dataSet[0];
+	for(var i = 1; i < dataSet.length; i++){
+		if(databig < dataSet[i]) databig = dataSet[i];
+		if(datasmall > dataSet[i]) datasmall = dataSet[i];
+	}
+	databig *= 8/7;
+	var graphWidth = svgs.Width - margin.left - margin.right;
+	var graphHeight = svgs.Height - margin.top - margin.bottom;
+	var barWidth = graphWidth/(vname.length*2 -1);
+	d3.select("#right")
+		.append("svg").attr("id","BarGraph").attr("class",name+"Bar")
+		.attr("width", svgs.Width).attr("height", svgs.Height);
+	var bar = d3.select("."+name+"Bar")
+				.selectAll("rect").data(dataSet)
+	d3.select("."+name+"Bar").append("text").attr("class","topname")
+		.attr("x", svgs.Width/2)
+		.attr("y",30)
+		.style("font-size", "30px")
+		.text(name)
+	bar.enter()
+		.append("rect")
+		.attr("x", function(d,i) {return margin.left+i*barWidth*2;})
+		.attr("y", svgs.Height - margin.bottom)
+		.attr("width", barWidth)
+		.attr("height", 0)
+		.transition()
+		.duration(2000)
+		.attr("y", function(d,i) {return svgs.Height - margin.bottom - (graphHeight/databig)*d;})
+		.attr("height", function(d,i) {return (graphHeight/databig)*d +"px";})
+	bar.enter()
+		.append("text").attr("class","freq")
+		.transition()
+		.delay(2000)
+		.attr("x", function(d,i) {return margin.left+ i*barWidth*2 + barWidth/2;})
+		.attr("y", function(d,i) {return svgs.Height - margin.bottom - (graphHeight/databig)*d - 10;})
+		.text(function(d,i) {return d;})
+	bar.enter()
+		.append("text").attr("class","barname")
+		.data(vname)
+		.attr("x", function(d,i) {return margin.left+ i*barWidth*2 + barWidth/2;})
+		.attr("y", svgs.Height - margin.bottom + 20)
+		.text(function(d) {return d;})
+	var yScale = d3.scaleLinear().domain([0,databig]).range([margin.top+graphHeight, margin.top])
+	d3.select("."+name+"Bar").append("g")
+		.attr("class","axis")
+		.attr("transform","translate(30,0)")
+		.call(d3.axisLeft(yScale))
+}
+
+
+/**** 히스토그램을 그리는 함수들 ****/
+//function HistoPlotMainB(data,vname,dataSet,histo){
+	//secondValue 숨기기
+	//firstValue에 모든 변수명 넣기
+	//각 firstValue의 변수명 선택시 해당 이름으로 그래프 그리기 시작
+		//form
+			//막대의 개수 받아 표시
+			//시작 지점과 간격 받아 표시
+		//svg
+			//각각의 text
+			
+			//(따로 함수화해야하는 파트)//
+			//left, bottom scale
+				//시작, 끝좌표, 간격마다 표시할 값, 간격크기
+			//분리//
+			//막대
+				//막대가 들어갈 칸(graph)의 크기(width,height로), 마진, 막대의 개수, 막대의 높이
+			//정규그래프
+				//막대에 맞춘 모양
+//}
+function HistoPlotMain(data, vname, dataSet, histo){
+	//fisrt 활성화
+	d3.select("#firstValue").style("visibility","visible")
+	d3.select("#firstValueName").style("visibility","visible")
+	//second 숨기기
+	d3.select("#secondValue").style("visibility","hidden")
+	d3.select("#secondValueName").style("visibility","hidden")
+	d3.select("#firstValueName").text("MainValue : ")
+	
+	var svgBar = {Width:750, Height:750};
+	var margin = {top:70, bottom:30, left:100, right:50};
+	var histData = ["----------"];
+	for(var i = 0; i < data["columns"].length; i++){
+		histData.push(data["columns"][i]);
+	}
+	var head = d3.select("#firstValue")
+				.selectAll("option").data(histData)
+	head.enter()
+		.append("option").attr("value", function(d) {return d;}).text(function(d) {return d;})
+	
+	d3.select("#firstValue").on("change", function() {
+			var i;
+			for(i = 0; i < data["columns"].length; i++){
+				if(data["columns"][i] == this.value) break;
+			}
+			if( this.value != "----------") {
+				if(histo[i] == 0) alert("문자형 데이터를 포함한 변수입니다.");
+				else makehistogram(vname[i], dataSet[i], this.value.replace(" ", "") ,data.length, svgBar, margin);
+			}
+		})
+}
+function makehistogram(vname,dataSet,name, total, svgs, margin){
+	//기존의 svg, form 정리
+	d3.selectAll("svg").remove()
+	d3.selectAll("form").remove()
+	
+	var myform = d3.select("#lefttop").append("form")//나중에 지우기 쉽게 form으로 묶는다.
+	myform.append("span").text("구간의 개수 : ")
+	myform.append("input").attr("type","Number").attr("id",name+"form1").attr("value", 7).attr("class", "valueFormB")
+			.on("change", function() {
+			drawHisto(vname,dataSet,name,total,svgs,margin,document.getElementById(name+"form1").value, 0, vname[0]);})
+	myform.append("br")
+	myform.append("span").text("초기값 : ")
+	myform.append("input").attr("type","Number").attr("id",name+"form2").attr("class", "valueForm")
+	myform.append("span").text("  구간의 간격 : ")
+	myform.append("input").attr("type","Number").attr("id",name+"form3").attr("class", "valueForm")
+	myform.append("button").attr("type","button").text("클릭")
+			.on("click", function() {
+			drawHisto(vname,dataSet,name,total,svgs,margin,0,document.getElementById(name+"form3").value, Number(document.getElementById(name+"form2").value));})
+	drawHisto(vname,dataSet,name,total,svgs,margin, 7, 0, vname[0]);
+}
+//히스토그램용으로 데이터바꿔 출력
+function parseHisto(vnameMain, dataSetMain, section, sectWidthMain, Mindata, total){
+	var tmp = 0, temp = 1, sectWidth;
+	var vname = [],dataSet = [], dataSetDosu = [];
+	if(sectWidthMain == 0) sectWidth = (vnameMain[vnameMain.length-1] - vnameMain[0] + 0.01)/section;
+	else sectWidth = sectWidthMain;
+	
+	for(var i = 0; vnameMain[vnameMain.length-1]-Mindata > sectWidth*(i-1); i++){
+		vname.push(Mindata+sectWidth*i);
+	}
+	while(vnameMain[0] > vname[temp+1]) {dataSetDosu.push(0);dataSet.push(0); temp++;}
+	for(var i = 0; i < dataSetMain.length; i++){
+		if(vnameMain[i] < vname[temp]) tmp += dataSetMain[i];
+		else{dataSet.push(tmp/(total*sectWidth)); dataSetDosu.push(tmp); tmp = dataSetMain[i]; temp++;}
+	}
+	dataSet.push(tmp/(total*sectWidth));
+	dataSetDosu.push(tmp);
+	
+	var databig = dataSet[0];
+	var datasmall = dataSet[0];
+	for(var i = 1; i < dataSet.length; i++){
+		if(databig < dataSet[i]) databig = dataSet[i];
+		if(datasmall > dataSet[i]) datasmall = dataSet[i];
+	}
+	databig *= 8/7;
+	
+	return {vname:vname, dataSet:dataSet, dataSetDosu:dataSetDosu, sectWidth:sectWidth,databig,datasmall};
+}
+function drawHisto(vnameMain,dataSetMain,name,total,svgs,margin, section, sectWidthMain, Mindata, dosuSwit = 1){
+	//svg clear
+	d3.select("."+name+"Histo").remove()
+	d3.select("#right")
+		.append("svg").attr("id","Histogram").attr("class",name+"Histo")
+		.attr("width", svgs.Width).attr("height", svgs.Height)
+	//히스토그램만의 크기
+	var graphs = {Width:svgs.Width - margin.left - margin.right,Height: svgs.Height - margin.top - margin.bottom};
+	//기존의 도수로 이루어진 data를 히스토그램 용으로 묶어주는 함수(json형식의 return값으로 필요한 값들을 최대한 계산)
+	var graphData = parseHisto( vnameMain, dataSetMain, section, sectWidthMain, Mindata, total);
+	//dosuSwit==end div에 도수분포표를 표시할지
+	if(dosuSwit == 1){ 
+		d3.select(".Dosu").remove()
+		drawdosu(graphData.vname,graphData.dataSetDosu,name,calcData(vnameMain,dataSetMain,total),2);
+	} 
+	d3.select("."+name+"Histo").append("text").attr("class","topname")
+		.attr("x", svgs.Width/2)
+		.attr("y",30).style("font-size","30px")
+		.text(name)
+	var yScale = d3.scaleLinear().domain([0,graphData.databig]).range([margin.top+graphs.Height, margin.top])
+	d3.select("."+name+"Histo").append("g")
+		.attr("class","axis")
+		.attr("transform","translate("+(margin.left-20)+",0)")
+		.call(d3.axisLeft(yScale))
+	makeBottomScale("."+name+"Histo", graphData.vname[0], graphData.vname[graphData.vname.length-1], margin.left, margin.left+graphs.Width, svgs.Height-margin.bottom, graphData.sectWidth,graphData.sectWidth);
+
+	drawHistGraph(svgs,graphs,margin, graphData, vnameMain,dataSetMain,name+"Histo",total);
+}
+function drawHistGraph(svgs,graphs,margin, graphData, vnameMain,dataSetMain,className,total,Swit=1){
+	var barWidth = graphs.Width/graphData.dataSet.length;
+	for(var i = 0; i < graphData.dataSet.length; i++){
+		d3.select("."+className).append("rect")
+			.attr("x", margin.left + i*barWidth)
+			.attr("y", svgs.Height - margin.bottom)
+			.attr("width", barWidth)
+			.attr("height", 0)
+			.transition()
+			.duration(2000)
+			.attr("y", svgs.Height - margin.bottom - (graphs.Height/graphData.databig)*graphData.dataSet[i])
+			.attr("height", (graphs.Height/graphData.databig)*graphData.dataSet[i] +"px")
+	}
+	drawNormalDist(calcData(vnameMain,dataSetMain,total), className, total, graphs, margin,graphData);
+	
+	if(Swit == 1){ 
+		for(var i = 0; i < graphData.dataSet.length; i++){
+			d3.select("."+className).append("text").attr("class","freq")
+				.transition()
+				.delay(2000)
+				.attr("x", margin.left + i*barWidth + barWidth/2)
+				.attr("y", svgs.Height - margin.bottom - (graphs.Height/graphData.databig)*graphData.dataSet[i] - 10)
+				.text(graphData.dataSet[i].toFixed(3))
+		}
+	}
+}
+function drawNormalDist(calc, className, total, graphs, margin, graphData){
+	var mindata = graphData.vname[0], maxdata = graphData.vname[graphData.vname.length-1], databig = graphData.databig;
+	var cnt = 1000, tmpWidth = maxdata-mindata, tmp = tmpWidth / cnt, start = mindata, first, third, save = 0;
+	first = normal(start,calc.mean,calc.SE);
+	for(var i = 0; i < cnt; i++){
+		third = normal(start + tmp, calc.mean, calc.SE);
+		d3.select("."+className).append("line")
+			.attr("x1", margin.left + graphs.Width*(start-mindata)/tmpWidth)
+			.attr("y1",	margin.top + graphs.Height*(databig-first)/databig)
+			.attr("x2", margin.left + graphs.Width*(start+tmp-mindata)/tmpWidth)
+			.attr("y2", margin.top + graphs.Height*(databig-third)/databig)
+			.style("stroke", "black")
+		start += tmp;
+		first = third;
+	}
+}
+
+/**** 산점도를 그리는 함수들 */
+//function ScatterPlot (){
+	//secondValue 활성화
+	//first, second에 변수명 입력시
+	//svg초기화
+	//first, second, 범주, 회귀버튼 변경시 산점도 내부를 그리는 함수 시행
+		//left, right scale
+		//각 text
+		
+		//함수화//
+		//scat
+		//선형회귀선
+		
+//}
+function ScatterPlotMain(data, vname, dataSet, histo){
+	//fisrtValue 활성화
+	d3.select("#firstValue").style("visibility","visible")
+	d3.select("#firstValueName").style("visibility","visible")
+	//secondValue 활성화
+	d3.select("#secondValue").style("visibility","visible")
+	d3.select("#secondValueName").style("visibility","visible")
+	//그래프의 넓이, 높이 지정
+	var graphScatter = {Width:550, Height:550};
+	var marginScatter = {top:70, bottom:50, left:70, right:70};
+	//svg 전부 삭제
+	d3.selectAll("svg").remove()
+	//first,second,범주에 변수 넣기(first,second표시 이름도 변경)
+	d3.select("#firstValueName").text("X value : ")
+	d3.select("#secondValueName").text("Y value : ")
+	var positive_value = ["----------"];
+	var bumju = ["----------"];
+	for(var i = 0; i < histo.length; i++){
+		positive_value.push(data["columns"][i]);
+		if(histo[i] != 2) bumju.push(data["columns"][i]);
+	}
+	
+	d3.select("#firstValue")
+		.selectAll("option").data(positive_value).enter()
+		.append("option").attr("value", function(d) {return d;}).text(function(d) {return d;})
+	d3.select("#secondValue")
+		.selectAll("option").data(positive_value).enter()
+		.append("option").attr("value", function(d) {return d;}).text(function(d) {return d;})
+		
+	d3.select("#firstValue").on("change", function() {
+			var i;
+			for(i = 0; i < data["columns"].length; i++){
+				if(data["columns"][i] == this.value) break;
+			}
+			var asdf = document.getElementById("secondValue").value;
+			if(this.value == asdf & asdf != "----------") alert("중복된 값입니다.");
+			else if(this.value != "----------" & asdf != "----------") {
+				if(histo[i] == 0 | histo[data["columns"].indexOf(asdf)] == 0) alert("문자형 데이터를 포함한 변수입니다.");
+				else if(document.getElementById("regressions").value == "선형회귀ON")
+					makeScatterPlot(this.value, asdf, data,vname,dataSet, graphScatter, marginScatter,document.getElementById("bumjuSelect").value, 1);
+				else makeScatterPlot(this.value, asdf, data,vname,dataSet, graphScatter, marginScatter,document.getElementById("bumjuSelect").value);
+			}
+		})
+	d3.select("#secondValue").on("change", function() {
+			var i;
+			for(i = 0; i < data["columns"].length; i++){
+				if(data["columns"][i] == this.value) break;
+			}
+			var asdf = document.getElementById("firstValue").value;
+			if(this.value == asdf & asdf != "----------") alert("중복된 값입니다.");
+			else if(this.value !="----------" & asdf != "----------"){
+				if(histo[i] == 0 | histo[data["columns"].indexOf(asdf)] == 0) alert("문자형 데이터를 포함한 변수입니다.");
+				else if(document.getElementById("regressions").value == "선형회귀ON")
+					makeScatterPlot(asdf, this.value, data,vname,dataSet, graphScatter, marginScatter,document.getElementById("bumjuSelect").value, 1);
+				else makeScatterPlot(asdf, this.value, data,vname,dataSet, graphScatter, marginScatter,document.getElementById("bumjuSelect").value);
+			}
+		})
+	//지우기 쉽게 form안에 생성
+	var myform = d3.select("#lefttop").append("form")
+	myform.append("span").text("범주 설정 : ")
+	myform.append("select").attr("id","bumjuSelect")
+			.on("change", function() {
+				var asdf1 = document.getElementById("firstValue").value;
+				var asdf2 = document.getElementById("secondValue").value;
+				if(asdf1 == asdf2 & asdf2 != "----------") alert("중복된 값입니다.");
+				else if(asdf1 !="----------" & asdf2 != "----------"){
+					if(histo[data["columns"].indexOf(asdf1)] == 0 | histo[data["columns"].indexOf(asdf2)] == 0)
+						alert("문자형 데이터를 포함한 변수입니다.");
+					else if(document.getElementById("regressions").value == "선형회귀ON")
+						makeScatterPlot(asdf1,asdf2, data,vname,dataSet, graphScatter, marginScatter, this.value, 1);
+					else makeScatterPlot(asdf1,asdf2, data,vname,dataSet, graphScatter, marginScatter, this.value);
+				}})
+	
+	myform.select("#bumjuSelect")
+			.selectAll("option").data(bumju).enter()
+			.append("option").attr("value", function(d) {return d;}).text(function(d) {return d;})
+	//버튼 클릭시 on/off 변환되며 그래프에 바로 적용되는 코드		
+	myform.append("input").attr("type","button").attr("id", "regressions").attr("value", "선형회귀OFF")
+			.on("click", function(){
+				var asdf1 = document.getElementById("firstValue").value;
+				var asdf2 = document.getElementById("secondValue").value;
+				if(asdf1 == asdf2 & asdf2 != "----------") alert("중복된 값입니다.");
+				else if(asdf1 !="----------" & asdf2 != "----------"){
+					if(histo[data["columns"].indexOf(asdf1)] == 0 | histo[data["columns"].indexOf(asdf2)] == 0)
+						alert("문자형 데이터를 포함한 변수입니다.");
+					else if(document.getElementById("regressions").value == "선형회귀OFF"){
+						d3.select("#regressions").attr("value","선형회귀ON")
+						makeScatterPlot(asdf1, asdf2, data,vname,dataSet, graphScatter, marginScatter, document.getElementById("bumjuSelect").value, 1);
+					}
+					else {
+						d3.select("#regressions").attr("value","선형회귀OFF")
+						makeScatterPlot(asdf1, asdf2, data,vname,dataSet, graphScatter, marginScatter, document.getElementById("bumjuSelect").value);
+					}
+				}
+			})
+}
+function makeScatterPlot(Xname, Yname, data,vname,dataSet, graphs, margin, bumjuName, reg=0){
+	//class명에 공백이 들어가면 에러가 나는 현상때문에 추가
+	var Xn = Xname.replace(" ", "");
+	var Yn = Yname.replace(" ", "");
+	
+	//도수분포표 재설정
+	d3.selectAll(".Dosu").remove()
+	var xNum = data["columns"].indexOf(Xname);
+	var yNum = data["columns"].indexOf(Yname);
+	drawdosu(vname[xNum],dataSet[xNum],Xname,calcAll(Xname,data),0);
+	drawdosu(vname[yNum],dataSet[yNum],Yname,calcAll(Yname,data),0);
+	
+	//svg넓이 계산
+	var svgs = {Width:graphs.Width + margin.left + margin.right, Height:graphs.Height + margin.top + margin.bottom};
+	//minmax 계산
+	var Calc = ScatterMinMax(Xname,Yname,data);
+	//svgClear
+	d3.selectAll("svg").remove()
+	d3.select("#right")
+		.append("svg").attr("id","ScatterPlot").attr("class",Xn+Yn+"Scat")
+		.attr("width", svgs.Width).attr("height", svgs.Height)
+	
+	
+	//산점도를 그려주는 내부 사각형
+	d3.select("."+Xn+Yn+"Scat").append("rect")
+		.attr("x", margin.left).attr("y", margin.top).attr("width", graphs.Width).attr("height",graphs.Height)
+	//점 찍어주는 함수
+	drawScatter(Xn+Yn+"Scat",Xname,Yname,bumjuName,data,graphs,margin,Calc);
+	//text 표시
+	d3.select("."+Xn+Yn+"Scat")
+		.append("text").attr("class","topname")
+		.attr("x", svgs.Width/2)
+		.attr("y",30).style("font-size","30px")
+		.text(Xname + " vs " + Yname)
+	d3.select("."+Xn+Yn+"Scat")
+		.append("text").attr("class","dataname")
+		.attr("x", -(graphs.Height/2 + margin.top))
+		.attr("y", 20)
+		.attr("transform","rotate(-90)")
+		.text(Yname)
+	d3.select("."+Xn+Yn+"Scat")
+		.append("text").attr("class","dataname")
+		.attr("x", graphs.Width/2 + margin.left)
+		.attr("y", margin.top + graphs.Height + 40)
+		.text(Xname)
+		
+	if(reg == 1) makeLinearReg("."+Xn+Yn+"Scat", Xname, Yname, data, graphs, margin, Calc);
+
+	makeLeftScale("."+Xn+Yn+"Scat", Calc.minY, Calc.maxY, margin.top+graphs.Height, margin.top, margin.left, (Calc.maxY-Calc.minY)/8,(Calc.maxY-Calc.minY)/8);
+	makeBottomScale("."+Xn+Yn+"Scat", Calc.minX, Calc.maxX, margin.left, margin.left+graphs.Width, margin.top + graphs.Height, (Calc.maxX-Calc.minX)/8,(Calc.maxX-Calc.minX)/8);
+}
+function ScatterMinMax(Xname,Yname,data, dosuSwit = 1){
+	//각 X축Y축의 minmax
+	var maxX = data[0][Xname], minX = data[0][Xname];
+	var maxY = data[0][Yname], minY = data[0][Yname];
+	for(var i = 0; i < data.length; i++){
+		if(maxX < Number(data[i][Xname])) maxX = Number(data[i][Xname]);
+		if(minX > Number(data[i][Xname])) minX = Number(data[i][Xname]);
+		if(maxY < Number(data[i][Yname])) maxY = Number(data[i][Yname]);
+		if(minY > Number(data[i][Yname])) minY = Number(data[i][Yname]);
+	}
+	//약간의 버퍼(minmax가 각각 음수 양수일때 다름)
+	var up = 1.05, down = 0.95;
+	if(maxX > 0 ) maxX *= up; else maxX *= down;
+	if(maxY > 0 ) maxY *= up; else maxY *= down;
+	if(minX < 0 ) minX *= up; else minX *= down;
+	if(minY < 0 ) minY *= up; else minY *= down;
+	return {minX:minX,maxX:maxX,minY:minY,maxY:maxY};
+}
+function drawScatter(name,Xname,Yname,bumjuName,data,graphs,margin,Calc){
+	var minX = Calc.minX, maxX = Calc.maxX, minY = Calc.minY, maxY=Calc.maxY;
+	
+	//범주별로 나눌씨 범주에 들어갈 색깔
+	var colorSample = ["black", "red", "blue", "yellow", "green", "cyan", "magenta", "gray"];
+	//범주색깔별 value를 표시해주는 함수
+	if(bumjuName != "----------"){
+		//분류하기로 한 범주의 범주 종류를 구분
+		var bumjuType = [];
+		for(var i = 0; i < data.length; i++){
+			var swit = 0;
+			for(var j = 0; j < bumjuType.length; j++){
+				if(bumjuType[j] == data[i][bumjuName]) {swit = 1; break;}
+			}
+			if(swit == 0) bumjuType.push(data[i][bumjuName]);
+		}
+		checkVname(bumjuType, colorSample, 1);
+		for(var i = 0; i < bumjuType.length; i++){
+			d3.select("."+name)
+				.append("rect").attr("x", margin.left + graphs.Width + 16)
+				.attr("y", margin.top + graphs.Height/2 + 32*i)
+				.attr("width", 16).attr("height", 16).style("fill",colorSample[i])
+			d3.select("."+name)
+				.append("text").attr("x", margin.left + graphs.Width + 38)
+				.attr("y",margin.top + graphs.Height/2 + 32*(i+0.5))
+				.style("font-size", "16px")
+				.text( bumjuType[i])
+		}
+	}
+	//점 그리기
+	
+	for(var i = 0; i < data.length; i++){
+		d3.select("."+name).append("circle")
+			.attr("cx", margin.left + graphs.Width * (data[i][Xname]-minX)/(maxX-minX))
+			.attr("cy", margin.top + graphs.Height * (1 - (data[i][Yname]-minY)/(maxY-minY)))
+			.style("fill", function() {
+				if(bumjuName == "----------") return "black";
+				else {
+					return colorSample[bumjuType.indexOf(data[i][bumjuName])];
+				}
+			})
+	}
+}
+function makeLinearReg(className, Xname, Yname, data, graphs, margin, Calc){
+	var minX = Calc.minX, maxX = Calc.maxX, minY = Calc.minY, maxY=Calc.maxY;
+	var XYcalc = calcXY(Xname, Yname, data);
+	var X1 = margin.left + graphs.Width*((minY-XYcalc.betaZero)/XYcalc.betaOne - minX)/(maxX-minX);
+	if( X1 < margin.left ) {
+		X1 = margin.left;
+		var Y1 = margin.top + graphs.Height*(maxY - (XYcalc.betaZero + XYcalc.betaOne*minX))/(maxY-minY);
+	}
+	else if( X1 > margin.left+graphs.Width ) {
+		X1 = margin.left+graphs.Width;
+		var Y1 = margin.top + graphs.Height*(maxY - (XYcalc.betaZero + XYcalc.betaOne*maxX))/(maxY-minY);
+	}
+	else var Y1 = margin.top+graphs.Height;
+	var X2 = margin.left + graphs.Width*((maxY-XYcalc.betaZero)/XYcalc.betaOne - minX)/(maxX-minX);
+	if( X2 < margin.left ) {
+		X2 = margin.left;
+		var Y2 = margin.top + graphs.Height*(maxY - (XYcalc.betaZero + XYcalc.betaOne*minX))/(maxY-minY);
+	}
+	else if( X2 > margin.left+graphs.Width ) {
+		X2 = margin.left+graphs.Width;
+		var Y2 = margin.top + graphs.Height*(maxY - (XYcalc.betaZero + XYcalc.betaOne*maxX))/(maxY-minY);
+	}
+	else var Y2 = margin.top;
+	
+	d3.select(className).append("line")  //y = betaZero + betaOne*X
+		.attr("x1", X1).attr("y1",Y1).attr("x2",X2).attr("y2",Y2)
+		.style("stroke","black")
+}
+/**** 산점도행렬 그리는 함수 */
+function ScatterMatrix(data, vname, dataSet, histo){
+	//fisrtValue 숨기기
+	d3.select("#firstValue").style("visibility","hidden")
+	d3.select("#firstValueName").style("visibility","hidden")
+	//secondValue 숨기기
+	d3.select("#secondValue").style("visibility","hidden")
+	d3.select("#secondValueName").style("visibility","hidden")
+	
+	var total = 0;
+	for(var i = 0; i< histo.length; i++){
+		total += (histo[i] != 0);
+	}
+	var MainSvg = {Width:780, Height:780};
+	var buffer = 20;
+	var margin = {top:80, bottom:60, left:60, right:80};
+	var graphs = {Width : (MainSvg.Width-(total-1)*buffer-margin.left-margin.right)/total,
+				  Height : (MainSvg.Height-(total-1)*buffer-margin.top-margin.bottom)/total};
+	d3.select("#right").append("svg").attr("class","ScatMatrix")
+		.attr("width",MainSvg.Width).attr("height",MainSvg.Height)
+		
+	var col = 0;
+	for(var i = 0; i < data["columns"].length; i++){
+		if(histo[i] != 0){
+			var low = 0;
+			for(var j = 0; j < data["columns"].length; j++){
+				if(histo[j] != 0){
+					var subMargin = {
+						top:margin.top + col*(graphs.Height+buffer), 
+						bottom:margin.bottom + (total-col-1)*(graphs.Height+buffer), 
+						left:margin.left + low*(graphs.Width+buffer), 
+						right:margin.right + (total-low-1)*(graphs.Width+buffer)
+					};
+					d3.select(".ScatMatrix").append("rect")
+						.attr("x", subMargin.left).attr("y",subMargin.top)
+						.attr("width", graphs.Width).attr("height", graphs.Height)
+						.style("fill", "white").style("opacity", 1.5);
+					var Calc = ScatterMinMax(data["columns"][j],data["columns"][i],data, 0)
+					if(i==j) {
+						var graphData = parseHisto( vname[i], dataSet[i], 7, 0, vname[i][0], data.length);
+						drawHistGraph(MainSvg,graphs,subMargin, graphData, vname[i],dataSet[i],"ScatMatrix",data.length,0);
+					}
+					else {
+						drawScatter("ScatMatrix",data["columns"][j],data["columns"][i],"----------",data,graphs,subMargin,Calc);
+					}
+					if(low == 0) makeLeftScale(".ScatMatrix", Calc.minY, Calc.maxY, subMargin.top+graphs.Height, subMargin.top, subMargin.left, (Calc.maxY-Calc.minY)/4, (Calc.maxY-Calc.minY)/2);
+					if(low % 2 == 0 & col == total-1) makeBottomScale(".ScatMatrix", Calc.minX, Calc.maxX, subMargin.left, subMargin.left+graphs.Width, subMargin.top + graphs.Height, (Calc.maxX-Calc.minX)/4, (Calc.maxX-Calc.minX)/2);
+					if(low % 2 == 1 & col == 0) makeTopScale(".ScatMatrix", Calc.minX, Calc.maxX, subMargin.left, subMargin.left+graphs.Width, subMargin.top, (Calc.maxX-Calc.minX)/4, (Calc.maxX-Calc.minX)/2);
+					if(col == 0){
+						d3.select(".ScatMatrix").append("text")
+							.attr("x", subMargin.left + graphs.Width/2).attr("y", subMargin.top - 30)
+							.style("text-anchor", "middle").style("font-size","25px")
+							.text(data["columns"][j])
+					}
+					if(low == total-1){
+						d3.select(".ScatMatrix").append("text")
+							.attr("x", subMargin.left + graphs.Width + 30).attr("y", subMargin.top +graphs.Height/2)
+							.style("text-anchor", "middle").style("font-size","25px").style("writing-mode","tb")
+							.text(data["columns"][i])
+					}
+					low++;
+				}
+			}
+			col++;
+		}
+	}
+}
+
+/**** 도수분포표를 그리는 함수 */
+function drawdosu(vname,dataSet,name,Calc,histo){
+	d3.select("#end").append("div").attr("id",name.replace(" ","")+"dosu").attr("class","Dosu")
+	var vnameUse = [{name:"계급", value:"도수"}];
+	for(var i = 0; i < dataSet.length; i++){
+		if(histo == 2){
+			if(i == 0) vnameUse.push({name:Number(vname[i+1]).toFixed(2)+"미만", value:dataSet[i]});
+			else if( i == dataSet.length-1) vnameUse.push({name:Number(vname[i]).toFixed(2)+"이상", value:dataSet[i]});
+			else vnameUse.push({name:Number(vname[i]).toFixed(2)+"~"+Number(vname[i+1]).toFixed(2), value:dataSet[i]});
+		}
+		else vnameUse.push({name:vname[i], value:dataSet[i]});
+	}
+	var tempC = d3.select("#"+name.replace(" ","")+"dosu").append("table").attr("class","calcs")
+	for(var i = -1; i < Calc.name.length; i++){
+		if(i == -1){
+			tempC.append("caption").text("변수명")
+			tempC.append("caption").style("font-size","25px").text(name)
+		}
+		else{
+			var tempD = tempC.append("tr")
+			tempD.append("td").text(Calc.name[i])
+			tempD.append("td").text(Number(Calc[Calc.name[i]]).toFixed(2))
+		}
+	}
+	
+	var dos = d3.select("#"+name.replace(" ","")+"dosu").append("table").selectAll("tr").data(vnameUse)
+	
+	dos.enter()
+		.append("tr").html(function(d,i){
+			return "<td>"+d.name+"</td><td>"+d.value+"</td>";
+		})
+}
+
+/**** data분류 함수 ****/
+function parseData(csvData, dataname, datavalue, checkHisto){
+	for(var i = 0; i < csvData["columns"].length; i++){
+		var vnameTmp = [];
+		var dataSetTmp = [];
+		for(var j = 0; j < csvData.length; j++){
+			search(vnameTmp,dataSetTmp,csvData[j][csvData["columns"][i]]);
+		}
+		checkHisto.push(checkVname(vnameTmp,dataSetTmp));
+		dataname.push(vnameTmp);
+		datavalue.push(dataSetTmp);
+	}
+}
+function search(vvname, datan, value){
+	for(var i = 0; i < vvname.length; i++){
+		if(vvname[i] == value) {
+			datan[i]++;
+			return;
+		}
+	}
+	vvname.push(value);
+	datan.push(1);
+	return;
+}
+function checkVname(vname,dataSet,swit=0){
+	for(var i = 0; i < vname.length; i++){
+		if(isNaN(Number(vname[i])) == true) return 0;
+	}
+	if(swit == 0){
+		for(var i = 0; i < vname.length; i++){
+			vname[i] = Number(vname[i]);
+		}
+	}
+	var tmp;
+	for(var i = 0; i < vname.length-1; i++){
+		for(var j = i+1; j < vname.length; j++){
+			if(vname[i] > vname[j]){
+				tmp = vname[i];
+				vname[i] = vname[j];
+				vname[j] = tmp;
+				tmp = dataSet[i];
+				dataSet[i] = dataSet[j];
+				dataSet[j] = tmp;
+			}
+		}
+	}
+	if(vname.length < 10) return 1; //데이터의 종류가 10개가 넘어가면 히스토그램이라고 간주
+	else return 2;
+}
+
+
+/**** 각각 bottom, left, top의 scale을 그리기위한 사용자함수 ****/
+function makeBottomScale(name,mindata,maxdata,minrange,maxrange, paddin,section, sectionText){
+	d3.select(name).append("line").attr("class","axis")
+		.attr("x1", minrange).attr("y1",paddin).attr("x2",maxrange).attr("y2",paddin)
+		.attr("stroke","black")
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/section);
+	while(mindata + i*section <= maxdata*1.000001){ //rnorm같은 매우 작은 값들의 집합에서 매우 작은 오차가 발생해 마지막값이 출력이 안되는 현상이 생겨 1.000001의 매우 작은 수를 곱하였다.
+		var xone = minrange +i*tmp;
+		d3.select(name).append("line").attr("class","axis")
+			.attr("x1", xone).attr("y1",paddin).attr("x2",xone).attr("y2",paddin + 6)
+			.attr("stroke","black")
+		i++;
+	}
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/sectionText);
+	while(mindata + i*sectionText <= maxdata*1.000001){
+		var xone = minrange +i*tmp;
+		d3.select(name).append("text").attr("class","histoBottomBar")
+			.attr("x", xone).attr("y",paddin + 20).style("font-size", "13px").style("text-anchor","middle")
+			.text((mindata+i*sectionText).toFixed(2))
+		i++;
+	}
+}
+function makeTopScale(name,mindata,maxdata,minrange,maxrange, paddin,section, sectionText){
+	d3.select(name).append("line").attr("class","axis")
+		.attr("x1", minrange).attr("y1",paddin).attr("x2",maxrange).attr("y2",paddin)
+		.attr("stroke","black")
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/section);
+	while(mindata + i*section <= maxdata*1.000001){
+		var xone = minrange +i*tmp;
+		d3.select(name).append("line").attr("class","axis")
+			.attr("x1", xone).attr("y1",paddin).attr("x2",xone).attr("y2",paddin - 6)
+			.attr("stroke","black")
+		i++;
+	}
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/sectionText);
+	while(mindata + i*sectionText <= maxdata*1.000001){
+		var xone = minrange +i*tmp;
+		d3.select(name).append("text").attr("class","histoBottomBar")
+			.attr("x", xone).attr("y",paddin - 8).style("font-size", "13px").style("text-anchor","middle")
+			.text((mindata+i*sectionText).toFixed(2))
+		i++;
+	}
+}
+function makeLeftScale(name,mindata,maxdata,minrange,maxrange, paddin,section,sectionText){
+	d3.select(name).append("line").attr("class","axis")
+		.attr("x1", paddin).attr("y1",minrange).attr("x2", paddin).attr("y2", maxrange)
+		.attr("stroke","black")
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/section);
+	while(mindata + i*section <= maxdata*1.000001){
+		var xone = minrange +i*tmp;
+		d3.select(name).append("line").attr("class","axis")
+			.attr("x1", paddin).attr("y1",xone).attr("x2",paddin - 6).attr("y2",xone)
+			.attr("stroke","black")
+		i++;
+	}
+	var i = 0;
+	var tmp = (maxrange-minrange)/((maxdata-mindata)/sectionText);
+	while(mindata + i*sectionText <= maxdata*1.000001){
+		var xone = minrange +i*tmp;
+		d3.select(name).append("text").attr("class","histoLeftBar")
+			.attr("x", paddin - 7).attr("y",xone + 4).style("text-anchor","end").style("font-size", "13px")
+			.text((mindata+i*sectionText).toFixed(2))
+		i++;
+	}
+}
+
+/**** 계산함수 ****/
+function calcAll(name, data){
+	var sum = 0, variable = 0;
+	var sortData = [];
+	for(var i = 0; i < data.length; i++){
+		sum += Number(data[i][name]);
+		sortData.push(Number(data[i][name]));
+	}
+	var mean = sum / data.length;
+	for(var i = 0; i < data.length; i++){
+		variable += (Number(data[i][name]-mean))*(Number(data[i][name])-mean);
+	}
+	var tmp;
+	for(var i = 0; i < sortData.length-1; i++){
+		for(var j = i+1; j < sortData.length; j++){
+			if(sortData[i] > sortData[j]){
+				tmp = sortData[i];
+				sortData[i] = sortData[j];
+				sortData[j] = tmp;
+			}
+		}
+	}
+	return {sum:sum, mean: mean, variable:variable/data.length, SE:Math.sqrt(variable/data.length)
+			,min:sortData[0], max:sortData[sortData.length-1], median:sortData[Math.floor(sortData.length/2)-1]
+			, qu1:sortData[Math.floor(sortData.length/4)-1], qu3:sortData[Math.floor(sortData.length*3/4)-1]
+			, name:["min","qu1","median","mean","qu3","max","sum","variable","SE"]};
+}
+function calcXY(Xname,Yname, data){
+	var Xcalc = calcAll(Xname, data);
+	var Ycalc = calcAll(Yname, data);
+	var cov = 0;
+	for(var i = 0; i < data.length; i++){
+		cov += (Xcalc.mean - Number(data[i][Xname]))*(Ycalc.mean - Number(data[i][Yname]));
+	}
+	var betaOne = cov/(Xcalc.variable*data.length);
+	return {X:Xcalc, Y:Ycalc, cov:cov/data.length, betaZero:(Ycalc.mean - betaOne*Xcalc.mean) , betaOne:betaOne};
+}
+function normal(x,mean,sq){
+	return Math.exp(-(x-mean)*(x-mean)/(2*sq*sq))/(Math.sqrt(2*Math.PI)*sq);
+}
+function calcData(vname,dataSet, total){
+	var sum = 0, variable = 0;
+	for(var i = 0; i < vname.length; i++){
+		sum += vname[i]*dataSet[i];
+	}
+	mean = sum/total;
+	for(var i = 0; i < vname.length; i++){
+		var tmp = vname[i]-mean;
+		variable += tmp*tmp*dataSet[i];
+	}
+	var tmp = 0;
+	for(var i = 0; i < dataSet.length; i++){
+		if( tmp+dataSet[i] >= total/4 & tmp < total/4) var qu1 = vname[i];
+		else if( tmp+dataSet[i] >= total/2 & tmp < total/2) var median = vname[i];
+		else if( tmp+dataSet[i] >= total*3/4 & tmp < total*3/4) var qu3 = vname[i];
+		tmp += dataSet[i];
+	}
+	
+	return {sum:sum, mean:mean, variable:variable/total, SE:Math.sqrt(variable/total)
+			,min:vname[0], max:vname[vname.length-1], median:median, qu1:qu1, qu3:qu3
+			, name:["min","qu1","median","mean","qu3","max","sum","variable","SE"]};
+}
+</script>
+</body>
+</html>
